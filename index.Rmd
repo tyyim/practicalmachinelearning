@@ -8,23 +8,62 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+# Loading Library
+We need the caret library and also the randomForest library for faster performance in fitting rf model.
+```{r message=FALSE, results='hide'}
+library(caret)
+library(randomForest)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+## Course Project Summary
+1. First I load the training data data.
+```{r data}
+setwd("~/Documents/R/praticalMachineLearning")
+data<-read.csv("pml-training.csv")
+case<-read.csv("pml-testing.csv")
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+2. I examine the dataset. There are 160 variables. By quickly looking at the data and the label of the variables, I decide to use the x,y,z measurements of the 4 gyrometers and accelerometers, a total of 24 features to fit the model.
+```{r feature_selection}
+gyros<-grep("^gyros",names(data))
+accel<-grep("^accel",names(data))
+select_feature<-c(gyros,accel,160) # with the outcome
+```
+Creating Training/Testing Sets
+``` {r split_dataset}
+inTrain <- createDataPartition(y=data$classe,p=0.75, list=FALSE)
+training <- data[inTrain,select_feature]
+testing <- data[-inTrain,select_feature]
+```
+3. I tried random forest and it yields a pretty good accuracy of 97%:
+```{r fit}
+# Fit model using random forrest
+modelFit<-randomForest(classe~.,method="rf",data=training)
+# Valid the model with the testing data
+confusionMatrix(testing$classe,predict(modelFit,testing))$overall[1]
+```
+4. I then tried to combine different classifiers.
+5. I couldn’t get glm work so I used rf, gbm and lda.
+6. Training of GBM model takes a lot of processing power and I tried using the doParallel package to speed up.
+7. Results of GBM and LDA were disappointing and the combined model was not good.
+8. Then, I try to fit a few  random forest with different number of trees, I found the results quite similar with trees = 200,600 & 1000.
+9. I tried to use GAM to ensemble them but the result was very poor.
+**Codes and results of Step 4-9 are not shown here.*
+10. Finally, I tried to add more features and accuracy jumped to 0.99.
+```{r more}
+magnet<-grep("^magnet",names(data))
+yaw<-grep("^yaw",names(data))
+pitch<-grep("^pitch",names(data))
+roll<-grep("^roll",names(data))
+select_feature<-c(gyros,accel,magnet,yaw,pitch,roll,160) # with the outcome
+training <- data[inTrain,select_feature]
+testing <- data[-inTrain,select_feature]
+case<-case[,select_feature]
+# Fit model using random forrest
+modelFit<-randomForest(classe~.,method="rf",data=training)
+# Valid the model with the testing data
+confusionMatrix(testing$classe,predict(modelFit,testing))$overall[1]
+```
+11. Using the fitted model to predict the 20 test cases
+```{r predict}
+predict(modelFit,case)
+```
